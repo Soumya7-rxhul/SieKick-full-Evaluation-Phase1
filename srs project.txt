@@ -1,0 +1,829 @@
+================================================================================
+        SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
+        Project: SideKick — Companion Matching Platform
+        Version: 1.0
+        Date: March 2026
+        Repository: https://github.com/Soumya7-rxhul/SieKick-full-Evaluation-Phase1
+================================================================================
+
+
+TABLE OF CONTENTS
+-----------------
+1. Introduction
+2. Overall Description
+3. System Architecture
+4. Functional Requirements
+5. Non-Functional Requirements
+6. Database Design
+7. API Specification
+8. Microservices Specification
+9. External Interfaces
+10. Security Requirements
+11. Deployment & Infrastructure
+12. Constraints & Assumptions
+
+
+================================================================================
+1. INTRODUCTION
+================================================================================
+
+1.1 Purpose
+-----------
+This document specifies the software requirements for SideKick, a companion-
+matching platform that connects individuals based on shared interests,
+availability, location, and safety scores. It is intended for developers,
+evaluators, and stakeholders involved in Phase 1 of the project.
+
+1.2 Scope
+---------
+SideKick enables users to:
+- Register and verify their identity via OTP (email), Government ID, and Face
+- Build a profile with interests, availability, and location
+- Get AI-powered companion suggestions ranked by a multi-factor algorithm
+- Send/receive companion requests and chat in real-time
+- Browse and join local events
+- Report and block unsafe users
+- Monitor all microservices via a live status dashboard
+
+1.3 Definitions
+---------------
+- OTP       : One-Time Password sent via email for phone verification
+- Vibe Tag  : Auto-generated personality label (e.g., "The Foodie")
+- Safety Score : A numeric score (0-100) reflecting user trustworthiness
+- Match     : A confirmed companion pairing between two users
+- Room      : A private chat channel between two matched users
+- NLP       : Natural Language Processing
+
+1.4 Technologies Used
+---------------------
+- Frontend     : React 18, React Router v6, Framer Motion, TailwindCSS,
+                 Axios, Socket.io-client, Lucide React, react-hot-toast
+- Backend      : Node.js, Express.js, MongoDB Atlas, Mongoose, JWT,
+                 Nodemailer, Socket.io, bcryptjs
+- Microservices: Python 3, Flask, Gunicorn
+- Database     : MongoDB Atlas (AWS Mumbai - ap-south-1), Replica Set 3 nodes
+- Deployment   : Vercel (Backend + Frontend), Render (Python microservices)
+
+
+================================================================================
+2. OVERALL DESCRIPTION
+================================================================================
+
+2.1 Product Perspective
+-----------------------
+SideKick is a full-stack web application with a microservices architecture.
+The React frontend communicates with a Node.js backend via REST APIs and
+Socket.io for real-time chat. The backend delegates specialized tasks to
+three Python microservices: Smart Matching, Face Verification, and NLP Services.
+
+2.2 Product Functions (Summary)
+--------------------------------
+- User registration with multi-step verification (OTP → ID → Face)
+- Profile setup with interests, availability, and location
+- AI-powered companion matching using a weighted scoring algorithm
+- Real-time chat with content moderation and sentiment analysis
+- Event creation, discovery, and joining
+- Safety system: reports, blocks, safety score adjustments
+- Auto vibe tag generation from user interests
+- Location-based user clustering
+- Live system status monitoring dashboard
+
+2.3 User Classes
+----------------
+- Guest       : Can access register/login pages only
+- Verified User: Full access after OTP verification
+- Admin       : Can view all reports (role-based access)
+
+2.4 Operating Environment
+--------------------------
+- Web browser (Chrome, Firefox, Safari, Edge)
+- Mobile-responsive design (max-width: 480px optimized)
+- Internet connection required
+- No native mobile app (PWA-ready)
+
+
+================================================================================
+3. SYSTEM ARCHITECTURE
+================================================================================
+
+3.1 High-Level Architecture
+----------------------------
+
+  [React Frontend]
+       |
+       | REST API + Socket.io
+       v
+  [Node.js Backend - Vercel]
+       |          |          |
+       v          v          v
+  [Python      [Python    [Python
+   Matching]    Face]      NLP]
+       |
+       v
+  [MongoDB Atlas]
+
+3.2 Service URLs
+----------------
+- Frontend         : https://sidekick-r40f4ul8b-soumya7-rxhuls-projects.vercel.app
+- Backend API      : https://sidekick-be.vercel.app
+- Smart Matching   : https://sidekick-microservice-2.onrender.com
+- Face Verification: https://sidekick-py.onrender.com
+- NLP Services     : https://sidekick-nlp-services.onrender.com
+- Database         : MongoDB Atlas cluster0.tygmrhq.mongodb.net (Mumbai)
+
+3.3 Repository Structure
+------------------------
+SieKick-full-Evaluation-Phase1/
+├── backend/                  Node.js/Express API
+│   ├── config/db.js          MongoDB connection
+│   ├── controllers/          Business logic
+│   ├── middleware/auth.js    JWT authentication
+│   ├── models/               Mongoose schemas
+│   ├── routes/               API route definitions
+│   ├── utils/socket.js       Socket.io handler
+│   └── server.js             Entry point
+├── frontend/                 React 18 SPA
+│   ├── src/pages/            All page components
+│   ├── src/components/       Reusable UI components
+│   ├── src/context/          Auth context
+│   └── src/utils/api.js      Axios instance
+├── python-matching/          Smart matching microservice
+├── python-face/              Face verification microservice
+├── python-nlp-services/      NLP microservices (4 endpoints)
+└── README.md
+
+
+================================================================================
+4. FUNCTIONAL REQUIREMENTS
+================================================================================
+
+4.1 Authentication & Verification
+-----------------------------------
+FR-01: User Registration
+  - Input: name, email, phone, password (min 8 chars)
+  - System validates all fields and checks for duplicates
+  - Password is hashed using bcrypt (salt rounds: 12)
+  - OTP (6-digit) is generated, stored in MongoDB with 10-min expiry
+  - OTP is sent to user's registered email via Gmail SMTP (Nodemailer)
+  - Response: userId, phone
+
+FR-02: OTP Verification
+  - Input: phone, otp
+  - System validates OTP against MongoDB record and checks expiry
+  - On success: isPhoneVerified = true, OTP cleared, JWT token issued
+  - JWT token valid for 7 days
+
+FR-03: Resend OTP
+  - Input: phone
+  - Generates new OTP, updates MongoDB, resends email
+
+FR-04: Login
+  - Input: email, password
+  - Validates credentials using bcrypt comparison
+  - Blocks login if phone not verified
+  - Returns JWT access token on success
+
+FR-05: Government ID Verification
+  - Input: idType, idNumber
+  - Simulates 95% success rate (production: DigiLocker/Aadhaar)
+  - Sets isIdVerified = true on success
+
+FR-06: Face Verification
+  - Input: faceDescriptor (string)
+  - Calls Python Face Verification microservice
+  - Returns confidence score (0.85-0.99)
+  - Sets isFaceVerified = true on success
+
+FR-07: Get Current User
+  - Returns authenticated user's profile (excludes passwordHash, otpCode)
+
+4.2 User Profile
+-----------------
+FR-08: Update Profile
+  - Fields: name, age, gender, bio, profilePhoto, interests, vibeTag,
+            availability, location, safetyContacts
+  - If interests updated and no vibeTag provided, auto-generates vibeTag
+    via NLP Vibe Tag microservice
+  - Returns updated user object
+
+FR-09: Get User Profile
+  - Returns public profile fields of any user by ID
+  - Fields: name, age, gender, bio, profilePhoto, interests, vibeTag,
+            safetyScore, isIdVerified, isFaceVerified, location
+
+FR-10: Block User
+  - Adds target userId to current user's blockedUsers array
+
+FR-11: Rate User
+  - Input: userId, rating (1-5), matchId
+  - Validates match exists and is accepted
+  - Adjusts safety score: rating >= 4 → +2, rating <= 2 → -5
+
+4.3 Companion Matching
+-----------------------
+FR-12: Get Match Suggestions
+  - Excludes: current user, blocked users, existing match participants
+  - Filters by same city if user has location set
+  - Calls Python Smart Matching microservice with user + candidates payload
+  - Falls back to local algorithm if Python service unavailable
+  - Returns top 20 matches with scores, filtered by totalScore >= 20
+
+FR-13: Send Match Request
+  - Input: receiverId, optional eventId
+  - Checks no existing match between the two users
+  - Creates Match record with status: pending
+  - Generates unique chatRoomId
+
+FR-14: Respond to Match Request
+  - Input: matchId, action (accept | reject)
+  - Only receiver can respond
+  - Updates match status accordingly
+
+FR-15: Get Active Matches
+  - Returns all accepted matches with populated user details
+
+FR-16: Get Pending Requests
+  - Returns all pending match requests where current user is receiver
+
+FR-17: Cancel Match Request
+  - Requester can cancel their own pending request
+
+4.4 Events
+-----------
+FR-18: Create Event
+  - Input: title, description, category, date, timeSlot, location,
+           maxParticipants, tags
+  - Categories: movie, sports, food, music, hangout, study
+
+FR-19: Get Events
+  - Filters: city, category, page (pagination, 20 per page)
+  - Returns only future open events, sorted by date
+
+FR-20: Join Event
+  - Adds user to participants array
+  - Closes event if maxParticipants reached
+
+FR-21: Get My Events
+  - Returns events created by or joined by current user
+
+FR-22: Delete Event
+  - Only event creator can delete their event
+
+4.5 Chat
+---------
+FR-23: Get Chat Rooms
+  - Returns all accepted matches with last message preview
+
+FR-24: Send Message
+  - Input: roomId, content
+  - Verifies user is part of the chat room via match record
+  - Runs content moderation (NLP) — blocks severe content
+  - Runs sentiment analysis (NLP) — detects distress signals
+  - Saves message to MongoDB
+  - Returns message with moderation and sentiment metadata
+
+FR-25: Get Chat History
+  - Returns last 100 messages in a room, sorted by createdAt
+  - Verifies user has access to the room
+
+FR-26: Real-time Messaging (Socket.io)
+  - Events: join_room, send_message, new_message, typing, user_typing
+  - JWT authentication on socket connection
+  - Messages broadcast to all users in the room
+
+4.6 Reports & Safety
+---------------------
+FR-27: Submit Report
+  - Input: reportedId, reason, description
+  - Reasons: harassment, fake_profile, inappropriate_behavior,
+             spam, no_show, other
+  - Auto-blocks reported user
+  - Decreases reported user's safety score by 10
+
+FR-28: Get Reports (Admin only)
+  - Returns last 50 reports with reporter and reported user details
+
+4.7 System Status
+------------------
+FR-29: Status Dashboard
+  - Frontend page showing live health of all 4 services
+  - Displays: service name, status (Operational/Down/Checking), latency (ms)
+  - Refresh individual service or all at once
+  - Accessible via Profile → System Status
+
+
+================================================================================
+5. NON-FUNCTIONAL REQUIREMENTS
+================================================================================
+
+5.1 Performance
+---------------
+- API response time: < 500ms for standard requests
+- Match suggestions: < 2s (including Python microservice call)
+- Python microservice fallback: < 100ms (local algorithm)
+- Chat message delivery: < 200ms via Socket.io
+
+5.2 Scalability
+---------------
+- Stateless backend (Vercel serverless functions)
+- MongoDB Atlas with 3-node replica set for high availability
+- Python microservices independently scalable on Render
+
+5.3 Availability
+----------------
+- Backend (Vercel): 99.9% uptime SLA
+- Python services (Render free tier): may have ~30s cold start after inactivity
+- MongoDB Atlas: 99.995% uptime SLA
+
+5.4 Security
+------------
+- Passwords hashed with bcrypt (12 salt rounds)
+- JWT tokens with 7-day expiry
+- All protected routes require Bearer token
+- CORS configured for allowed origins
+- OTP stored in MongoDB with 10-minute expiry
+- Sensitive fields excluded from API responses (passwordHash, otpCode)
+- User blocking and reporting system
+
+5.5 Usability
+-------------
+- Mobile-first responsive design (optimized for 480px width)
+- Smooth animations via Framer Motion
+- Toast notifications for all user actions
+- Skeleton loading states for async data
+- Animated page transitions
+
+5.6 Maintainability
+-------------------
+- Microservices architecture for independent deployment
+- Graceful fallback when Python services are unavailable
+- Environment variables for all configuration
+- Modular controller/route/model separation
+
+
+================================================================================
+6. DATABASE DESIGN
+================================================================================
+
+6.1 Collections
+---------------
+
+USER
+  _id           ObjectId (PK)
+  name          String (required)
+  email         String (required, unique, lowercase)
+  phone         String (required, unique)
+  passwordHash  String (required)
+  isPhoneVerified Boolean (default: false)
+  isIdVerified  Boolean (default: false)
+  isFaceVerified Boolean (default: false)
+  otpCode       String
+  otpExpiry     Date
+  age           Number
+  gender        Enum [male, female, non-binary, prefer-not-to-say]
+  bio           String (max: 200)
+  profilePhoto  String (base64 or URL)
+  faceDescriptor String
+  interests     [String]
+  vibeTag       String
+  availability  [{day: String, slots: [String]}]
+  location      {city: String, lat: Number, lng: Number}
+  safetyContacts [{name: String, phone: String}]
+  safetyScore   Number (default: 100)
+  blockedUsers  [ObjectId → User]
+  isActive      Boolean (default: true)
+  role          Enum [user, admin] (default: user)
+  createdAt     Date
+  updatedAt     Date
+
+MATCH
+  _id               ObjectId (PK)
+  requester         ObjectId → User (required)
+  receiver          ObjectId → User (required)
+  event             ObjectId → Event (optional)
+  status            Enum [pending, accepted, rejected, cancelled]
+  matchScore        Number
+  interestScore     Number
+  distanceScore     Number
+  availabilityScore Number
+  safetyScore       Number
+  chatRoomId        String
+  requesterRating   Number (1-5)
+  receiverRating    Number (1-5)
+  createdAt         Date
+  updatedAt         Date
+
+EVENT
+  _id             ObjectId (PK)
+  creator         ObjectId → User (required)
+  title           String (required)
+  description     String
+  category        String
+  date            Date (required)
+  timeSlot        String
+  location        {city: String, venue: String, lat: Number, lng: Number}
+  maxParticipants Number (default: 2)
+  participants    [ObjectId → User]
+  isOpen          Boolean (default: true)
+  tags            [String]
+  createdAt       Date
+  updatedAt       Date
+
+CHATMESSAGE
+  _id       ObjectId (PK)
+  roomId    String (required, indexed)
+  sender    ObjectId → User (required)
+  content   String (required)
+  type      Enum [text, system] (default: text)
+  readBy    [ObjectId → User]
+  createdAt Date
+  updatedAt Date
+
+REPORT
+  _id         ObjectId (PK)
+  reporter    ObjectId → User (required)
+  reported    ObjectId → User (required)
+  reason      Enum [harassment, fake_profile, inappropriate_behavior,
+                    spam, no_show, other] (required)
+  description String
+  status      Enum [pending, reviewed, resolved] (default: pending)
+  adminNote   String
+  createdAt   Date
+  updatedAt   Date
+
+
+================================================================================
+7. API SPECIFICATION
+================================================================================
+
+Base URL: https://sidekick-be.vercel.app/api
+Authentication: Bearer <JWT_TOKEN> in Authorization header
+
+AUTH ROUTES
+-----------
+POST   /auth/register          Register new user
+POST   /auth/verify-otp        Verify OTP
+POST   /auth/resend-otp        Resend OTP
+POST   /auth/login             Login
+POST   /auth/verify-id         [Protected] Verify Government ID
+POST   /auth/verify-face       [Protected] Verify Face
+GET    /auth/me                [Protected] Get current user
+
+USER ROUTES
+-----------
+PUT    /users/profile          [Protected] Update profile
+GET    /users/:id              [Protected] Get user profile
+POST   /users/block            [Protected] Block user
+POST   /users/report           [Protected] Report user
+POST   /users/rate             [Protected] Rate user after match
+
+MATCH ROUTES
+------------
+GET    /matches/suggestions    [Protected] Get match suggestions
+GET    /matches/active         [Protected] Get active matches
+GET    /matches/pending        [Protected] Get pending requests
+POST   /matches/request        [Protected] Send match request
+PUT    /matches/respond        [Protected] Accept/reject request
+PUT    /matches/cancel         [Protected] Cancel request
+
+EVENT ROUTES
+------------
+GET    /events                 [Protected] Get all events
+POST   /events                 [Protected] Create event
+GET    /events/mine            [Protected] Get my events
+POST   /events/:id/join        [Protected] Join event
+DELETE /events/:id             [Protected] Delete event
+
+CHAT ROUTES
+-----------
+GET    /chats/rooms            [Protected] Get chat rooms
+POST   /chats/send             [Protected] Send message
+GET    /chats/:roomId          [Protected] Get chat history
+
+REPORT ROUTES
+-------------
+POST   /reports                [Protected] Submit report
+GET    /reports                [Admin only] Get all reports
+
+HEALTH
+------
+GET    /health                 Service health check
+
+
+================================================================================
+8. MICROSERVICES SPECIFICATION
+================================================================================
+
+8.1 Smart Matching Service
+---------------------------
+URL: https://sidekick-microservice-2.onrender.com
+Language: Python 3 / Flask
+
+GET  /health
+  Response: {"service": "sidekick-matching", "status": "ok"}
+
+POST /match
+  Request:
+    {
+      "user": {
+        "id": "string",
+        "interests": ["string"],
+        "availability": [{"day": "string", "slots": ["string"]}],
+        "lat": number,
+        "lng": number
+      },
+      "candidates": [
+        {
+          "id": "string",
+          "interests": ["string"],
+          "availability": [...],
+          "lat": number,
+          "lng": number,
+          "safetyScore": number
+        }
+      ]
+    }
+  Response:
+    {
+      "results": [
+        {
+          "candidateId": "string",
+          "totalScore": number,
+          "interestScore": number,
+          "availabilityScore": number,
+          "distanceScore": number,
+          "safetyScore": number
+        }
+      ]
+    }
+
+  Scoring Algorithm:
+    totalScore = 0.35 * interestScore
+               + 0.25 * availabilityScore
+               + 0.25 * distanceScore
+               + 0.15 * safetyScore
+
+    interestScore    = Jaccard similarity (|A∩B| / |A∪B|) * 100
+    availabilityScore= Overlap of (day, slot) pairs / user total slots * 100
+    distanceScore    = (1 - km / 30) * 100  [Haversine formula, max 30km]
+    safetyScore      = candidate.safetyScore (0-100)
+
+  Returns top 20 results sorted by totalScore descending.
+
+8.2 Face Verification Service
+------------------------------
+URL: https://sidekick-py.onrender.com
+Language: Python 3 / Flask
+
+GET  /health
+  Response: {"service": "sidekick-face-verify", "status": "ok"}
+
+POST /face-verify
+  Request:  {"descriptor": "string"}
+  Response:
+    {
+      "verified": boolean,
+      "faceHash": "string (16-char SHA256 prefix)",
+      "confidence": number (0.85-0.99 if verified, 0.3-0.6 if not),
+      "message": "string"
+    }
+
+8.3 NLP Services
+-----------------
+URL: https://sidekick-nlp-services.onrender.com
+Language: Python 3 / Flask
+
+GET  /health
+  Response: {"service": "sidekick-nlp-services", "status": "ok"}
+
+POST /moderate
+  Request:  {"message": "string"}
+  Response:
+    {
+      "flagged": boolean,
+      "severity": "none | low | moderate | severe",
+      "reason": "string",
+      "action": "allow | flag_only | warn_user | block_and_alert",
+      "matched_terms": ["string"]  (if flagged)
+    }
+  Severity levels:
+    - severe   : self-harm, violence → block_and_alert
+    - moderate : toxic words → warn_user
+    - low      : excessive caps → flag_only
+    - none     : clean → allow
+
+POST /sentiment
+  Request:  {"message": "string"}
+  Response:
+    {
+      "sentiment": "positive | neutral | negative | distress",
+      "score": number (-1.0 to 1.0),
+      "mood": "happy | neutral | sad | danger",
+      "distress_detected": boolean,
+      "alert": "string" (if distress),
+      "action": "string" (if distress)
+    }
+
+POST /vibe-tag
+  Request:  {"interests": ["string"]}
+  Response:
+    {
+      "vibeTag": "string",
+      "confidence": number,
+      "scores": {"tag": score, ...}
+    }
+  Available Vibe Tags:
+    The Foodie, The Adventurer, The Gamer, The Bookworm, The Musician,
+    The Fitness Freak, The Artist, The Cinephile, The Techie,
+    The Social Butterfly, The Nature Lover, The Yogi, The Explorer
+
+POST /cluster
+  Request:
+    {
+      "users": [{"id": "string", "lat": number, "lng": number}],
+      "radius_km": number (default: 5.0)
+    }
+  Response:
+    {
+      "clusters": [
+        {
+          "clusterId": "string",
+          "userIds": ["string"],
+          "size": number,
+          "center": {"lat": number, "lng": number},
+          "radiusKm": number
+        }
+      ],
+      "totalClusters": number,
+      "totalUsers": number,
+      "usersWithoutLocation": number
+    }
+
+
+================================================================================
+9. EXTERNAL INTERFACES
+================================================================================
+
+9.1 Gmail SMTP (Nodemailer)
+----------------------------
+- Provider: Gmail
+- Auth: App Password (16-character)
+- Used for: OTP delivery to user email
+- Env vars: GMAIL_USER, GMAIL_PASS
+
+9.2 MongoDB Atlas
+------------------
+- Version: 8.0.20
+- Region: AWS Mumbai (ap-south-1)
+- Type: Replica Set - 3 nodes
+- Network: Allow access from anywhere (0.0.0.0/0) for Vercel compatibility
+- Env var: MONGO_URI
+
+9.3 Socket.io
+--------------
+- Version: 4.7.1
+- Transport: WebSocket with HTTP long-polling fallback
+- Auth: JWT token via handshake.auth.token
+- Events:
+    Client → Server: join_room, send_message, typing
+    Server → Client: new_message, user_typing
+
+9.4 Vercel
+-----------
+- Backend: Serverless Node.js functions
+- Frontend: Static React build
+- Auto-deploy on GitHub push
+
+9.5 Render
+-----------
+- Python microservices hosted on free tier
+- Auto-deploy on GitHub push
+- Cold start: ~30 seconds after 15 minutes of inactivity
+
+
+================================================================================
+10. SECURITY REQUIREMENTS
+================================================================================
+
+SR-01: Password Security
+  - Minimum 8 characters enforced
+  - Hashed with bcrypt, salt rounds: 12
+  - Never stored or returned in plaintext
+
+SR-02: Authentication
+  - JWT tokens signed with JWT_SECRET environment variable
+  - Token expiry: 7 days
+  - All protected routes validate Bearer token
+  - Invalid/expired tokens return 401
+
+SR-03: OTP Security
+  - 6-digit numeric OTP
+  - Stored in MongoDB (not in-memory for serverless compatibility)
+  - Expires after 10 minutes
+  - Cleared after successful verification
+
+SR-04: Data Sanitization
+  - Sensitive fields excluded from all API responses:
+    passwordHash, otpCode, otpExpiry, faceDescriptor
+
+SR-05: Content Safety
+  - All chat messages moderated before saving
+  - Severe content (self-harm, violence) blocked entirely
+  - Distress signals trigger safety alerts
+
+SR-06: User Safety
+  - Safety score system (0-100) tracks user behavior
+  - Reporting decreases reported user's score by 10
+  - Positive ratings increase score by 2
+  - Users can block others to prevent contact
+
+SR-07: CORS
+  - Backend configured to accept requests from allowed origins
+  - Currently set to allow all origins (to be tightened in production)
+
+
+================================================================================
+11. DEPLOYMENT & INFRASTRUCTURE
+================================================================================
+
+11.1 Backend (Vercel)
+----------------------
+- Platform: Vercel Serverless
+- Runtime: Node.js
+- Entry: server.js (exports Express app as module)
+- Config: vercel.json routes all traffic to server.js
+- Environment Variables:
+    MONGO_URI, JWT_SECRET, GMAIL_USER, GMAIL_PASS, CLIENT_URL,
+    PYTHON_SERVICE_URL, FACE_SERVICE_URL, NLP_SERVICE_URL
+
+11.2 Frontend (Vercel)
+-----------------------
+- Platform: Vercel Static
+- Build: npm run build (Create React App)
+- Output: build/
+- Environment Variables:
+    REACT_APP_API_URL=https://sidekick-be.vercel.app/api
+    REACT_APP_SOCKET_URL=https://sidekick-be.vercel.app
+
+11.3 Python Microservices (Render)
+------------------------------------
+- Platform: Render Free Tier Web Service
+- Runtime: Python 3
+- Build: pip install -r requirements.txt
+- Start: gunicorn app:app --bind 0.0.0.0:$PORT
+- Services:
+    sidekick-microservice-2  → Smart Matching
+    sidekick-py              → Face Verification
+    sidekick-nlp-services    → NLP Services
+
+11.4 Database (MongoDB Atlas)
+------------------------------
+- Cluster: cluster0.tygmrhq.mongodb.net
+- Region: AWS Mumbai (ap-south-1)
+- Version: 8.0.20
+- Type: Replica Set - 3 nodes
+- Backups: Inactive (free tier)
+- Network Access: 0.0.0.0/0 (all IPs allowed)
+
+
+================================================================================
+12. CONSTRAINTS & ASSUMPTIONS
+================================================================================
+
+12.1 Constraints
+-----------------
+- Render free tier services sleep after 15 minutes of inactivity
+  (30-second cold start on first request)
+- MongoDB Atlas free tier: 512MB storage limit
+- Vercel serverless functions: 10-second execution timeout
+- Face verification is simulated (not real biometric in Phase 1)
+- Government ID verification is simulated (95% success rate)
+- OTP is delivered via email only (no SMS in Phase 1)
+- Socket.io real-time chat not supported on Vercel serverless
+  (works in local dev; production requires separate WebSocket server)
+
+12.2 Assumptions
+-----------------
+- Users have a valid email address for OTP delivery
+- Users are located in India (phone format: +91XXXXXXXXXX)
+- Location data (lat/lng) is provided by the client
+- All microservices are reachable from the backend
+- MongoDB Atlas network access is open to all IPs
+
+12.3 Future Enhancements (Phase 2)
+------------------------------------
+- Real SMS OTP via Twilio
+- Real face verification via DeepFace
+- Real Government ID via DigiLocker/Aadhaar API
+- WebSocket server on Railway/Fly.io for real-time chat in production
+- Push notifications
+- Mobile app (React Native)
+- Admin dashboard
+- AI chat reply suggestions
+- Safety SOS button with live location sharing
+
+
+================================================================================
+END OF DOCUMENT
+SideKick SRS v1.0 — Phase 1 Evaluation
+================================================================================
