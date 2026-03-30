@@ -1,5 +1,7 @@
 const axios = require('axios');
 const { Event, ChatMessage, Match } = require('../models/index');
+const User = require('../models/User');
+const { sendEventJoinedEmail, sendEventJoinConfirmEmail } = require('../utils/emailNotifications');
 
 const NLP_URL = process.env.NLP_SERVICE_URL || 'http://localhost:8002';
 
@@ -36,7 +38,7 @@ exports.getEvents = async (req, res) => {
 
 exports.joinEvent = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findById(req.params.id).populate('creator', 'email name');
     if (!event || !event.isOpen) return res.status(404).json({ message: 'Event not found or closed' });
     if (event.participants.includes(req.user._id)) {
       return res.status(400).json({ message: 'Already joined' });
@@ -44,6 +46,14 @@ exports.joinEvent = async (req, res) => {
     event.participants.push(req.user._id);
     if (event.participants.length >= event.maxParticipants) event.isOpen = false;
     await event.save();
+
+    // Email to joiner
+    sendEventJoinConfirmEmail(req.user.email, req.user.name, event.title, event.date, event.location?.city);
+    // Email to creator
+    if (event.creator._id.toString() !== req.user._id.toString()) {
+      sendEventJoinedEmail(event.creator.email, event.creator.name, req.user.name, event.title);
+    }
+
     res.json({ event });
   } catch (err) {
     res.status(500).json({ message: err.message });

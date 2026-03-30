@@ -1,6 +1,7 @@
 const axios = require('axios');
 const User = require('../models/User');
 const { Match } = require('../models/index');
+const { sendMatchRequestEmail, sendMatchAcceptedEmail } = require('../utils/emailNotifications');
 
 const PYTHON_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
 
@@ -121,6 +122,11 @@ exports.sendRequest = async (req, res) => {
       event: eventId || null,
       chatRoomId: `room_${req.user._id}_${receiverId}_${Date.now()}`,
     });
+
+    // Send email to receiver
+    const receiver = await User.findById(receiverId).select('email name');
+    if (receiver) sendMatchRequestEmail(receiver.email, receiver.name, req.user.name);
+
     res.status(201).json({ match });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -144,6 +150,13 @@ exports.respondRequest = async (req, res) => {
     }
     match.status = action === 'accept' ? 'accepted' : 'rejected';
     await match.save();
+
+    // Send email to requester if accepted
+    if (action === 'accept') {
+      const requester = await User.findById(match.requester).select('email name');
+      if (requester) sendMatchAcceptedEmail(requester.email, requester.name, req.user.name);
+    }
+
     res.json({ match });
   } catch (err) {
     res.status(500).json({ message: err.message });
