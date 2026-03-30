@@ -18,8 +18,9 @@ const UserSchema = new mongoose.Schema({
   age: Number,
   gender: { type: String, enum: ['male', 'female', 'non-binary', 'prefer-not-to-say'] },
   bio: { type: String, maxlength: 200 },
-  profilePhoto: String, // base64 or URL
-  faceDescriptor: String, // simulated face hash
+  profilePhoto: String,
+  idPhoto: String,
+  faceDescriptor: String,
 
   // Matching data
   interests: [{ type: String }], // ['movies', 'sports', 'food', 'music', ...]

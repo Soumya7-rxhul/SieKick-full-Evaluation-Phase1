@@ -111,16 +111,50 @@ exports.resendOtp = async (req, res) => {
   }
 };
 
+// ── RESEND OTP BY EMAIL ───────────────────────────────────
+exports.resendOtpByEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(404).json({ message: 'No account found with this email.' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otpCode = otp;
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    await sendOtpEmail(user.email, otp, user.name);
+    res.json({ message: 'OTP sent to your email.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // ── LOGIN ─────────────────────────────────────────────────
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ message: 'Email and password are required' });
+    const { email, phone, password } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user || !(await user.matchPassword(password)))
-      return res.status(401).json({ message: 'Invalid email or password' });
+    if ((!email && !phone) || !password)
+      return res.status(400).json({ message: 'Email or phone and password are required' });
+
+    let user;
+    if (email) {
+      user = await User.findOne({ email: email.toLowerCase() });
+      if (!user)
+        return res.status(404).json({ message: 'No account found with this email. Please register first.' });
+    } else {
+      const phoneClean = phone.replace(/\s/g, '');
+      user = await User.findOne({ phone: phoneClean });
+      if (!user)
+        return res.status(404).json({ message: 'No account found with this phone number. Please register first.' });
+    }
+
+    const passwordMatch = await user.matchPassword(password);
+    if (!passwordMatch)
+      return res.status(401).json({ message: 'Incorrect password. Please try again.' });
 
     if (!user.isPhoneVerified)
       return res.status(403).json({ message: 'Phone not verified. Please verify OTP first.' });
@@ -135,16 +169,22 @@ exports.login = async (req, res) => {
 // ── MOCK GOV ID VERIFICATION ──────────────────────────────
 exports.verifyGovId = async (req, res) => {
   try {
-    const { idType, idNumber } = req.body;
+    const { idType, idNumber, idPhoto } = req.body;
     if (!idType || !idNumber)
       return res.status(400).json({ message: 'idType and idNumber are required' });
+
+    if (idType === 'aadhaar' && !/^\d{12}$/.test(idNumber))
+      return res.status(400).json({ message: 'Aadhaar must be exactly 12 digits' });
 
     const verified = Math.random() > 0.05;
     if (!verified)
       return res.status(400).json({ message: 'ID verification failed. Please try again.' });
 
-    await User.findByIdAndUpdate(req.user._id, { isIdVerified: true });
-    res.json({ message: 'Government ID verified ✅', idType });
+    const updates = { isIdVerified: true };
+    if (idPhoto) updates.idPhoto = idPhoto;
+
+    await User.findByIdAndUpdate(req.user._id, updates);
+    res.json({ message: 'Government ID verified', idType });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -165,14 +205,14 @@ exports.verifyFace = async (req, res) => {
       confidence = data.confidence;
       if (!verified) return res.status(400).json({ message: data.message });
     } catch (pyErr) {
-      console.warn('⚠️ Face service unavailable, using fallback:', pyErr.message);
+      console.warn('Face service unavailable, using fallback:', pyErr.message);
     }
 
     await User.findByIdAndUpdate(req.user._id, {
       isFaceVerified: true,
       faceDescriptor: faceDescriptor.substring(0, 64),
     });
-    res.json({ message: 'Face verified ✅', confidence });
+    res.json({ message: 'Face verified', confidence });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

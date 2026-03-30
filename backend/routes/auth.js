@@ -7,6 +7,7 @@ const { protect } = require('../middleware/auth');
 router.post('/register', ctrl.register);
 router.post('/verify-otp', ctrl.verifyOtp);
 router.post('/resend-otp', ctrl.resendOtp);
+router.post('/resend-otp-email', ctrl.resendOtpByEmail);
 router.post('/login', ctrl.login);
 router.post('/verify-id', protect, ctrl.verifyGovId);
 router.post('/verify-face', protect, ctrl.verifyFace);

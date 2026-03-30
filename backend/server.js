@@ -10,6 +10,7 @@ const eventRoutes = require('./routes/events');
 const chatRoutes = require('./routes/chats');
 const reportRoutes = require('./routes/reports');
 const safetyRoutes = require('./routes/safety');
+const meetupRoutes = require('./routes/meetups');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/events', ensureDB, eventRoutes);
 app.use('/api/chats', ensureDB, chatRoutes);
 app.use('/api/reports', ensureDB, reportRoutes);
 app.use('/api/safety', ensureDB, safetyRoutes);
+app.use('/api/meetups', ensureDB, meetupRoutes);
 
 app.use((req, res) => res.status(404).json({ message: `Route ${req.method} ${req.path} not found` }));
 app.use((err, req, res, next) => {
