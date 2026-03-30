@@ -20,17 +20,37 @@ export default function VerifyIdPage() {
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(false);
   const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
   const [uploaded, setUploaded] = useState(false);
   const videoRef = useRef();
   const canvasRef = useRef();
 
+  const getIdRules = () => {
+    if (idType === 'aadhaar') return { maxLen: 12, pattern: /^\d{12}$/, hint: 'Must be exactly 12 digits' };
+    if (idType === 'pan')     return { maxLen: 10, pattern: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, hint: 'Format: ABCDE1234F' };
+    if (idType === 'passport') return { maxLen: 8, pattern: /^[A-Z][0-9]{7}$/, hint: 'Format: A1234567' };
+    return { maxLen: 16, pattern: /.{6,}/, hint: 'Min 6 characters' };
+  };
+
+  const handleIdNumberChange = (e) => {
+    const val = e.target.value;
+    if (idType === 'aadhaar') {
+      // Only allow digits, max 12
+      if (/^\d*$/.test(val) && val.length <= 12) setIdNumber(val);
+    } else {
+      setIdNumber(val.toUpperCase().slice(0, getIdRules().maxLen));
+    }
+  };
+
   const stepIndex = step === 'gov-id' ? 3 : 4;
 
   const verifyId = async () => {
-    if (idNumber.length < 6) return setError('Enter valid ID number');
+    const { pattern, hint } = getIdRules();
+    if (!pattern.test(idNumber)) return setError(hint);
+    if (!file) return setError('Please upload a photo of your ID');
     setLoading(true); setError('');
     try {
-      await api.post('/auth/verify-id', { idType, idNumber });
+      await api.post('/auth/verify-id', { idType, idNumber, idPhoto: filePreview });
       updateUser({ isIdVerified: true });
       toast.success('ID verified!');
       setStep('face-scan');
@@ -67,7 +87,13 @@ export default function VerifyIdPage() {
     finally { setLoading(false); }
   };
 
-  const handleFileSelect = (f) => { setFile(f); setUploaded(true); };
+  const handleFileSelect = (f) => {
+    setFile(f);
+    setUploaded(true);
+    const reader = new FileReader();
+    reader.onload = (e) => setFilePreview(e.target.result);
+    reader.readAsDataURL(f);
+  };
 
   const inputStyle = { width: '100%', height: 48, background: '#2D2653', border: '1.5px solid #433B72', borderRadius: 12, padding: '0 14px', color: '#F1F0F7', fontSize: 14, fontFamily: 'Inter, sans-serif', outline: 'none' };
 
@@ -96,7 +122,18 @@ export default function VerifyIdPage() {
                     </div>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: '#6E6893', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>ID Number</label>
-                      <input style={inputStyle} placeholder="Enter ID number" value={idNumber} onChange={e => setIdNumber(e.target.value)} />
+                      <input style={inputStyle}
+                        placeholder={idType === 'aadhaar' ? '12-digit Aadhaar number' : 'Enter ID number'}
+                        value={idNumber}
+                        onChange={handleIdNumberChange}
+                        maxLength={getIdRules().maxLen}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: '#6E6893' }}>{getIdRules().hint}</span>
+                        <span style={{ fontSize: 11, color: idType === 'aadhaar' && idNumber.length === 12 ? '#34D399' : '#6E6893', fontWeight: 600 }}>
+                          {idNumber.length}/{getIdRules().maxLen}
+                        </span>
+                      </div>
                     </div>
                     <FileUploadZone onFileSelect={handleFileSelect} file={file} uploading={false} uploaded={uploaded} />
                     {error && <p style={{ color: '#F87171', fontSize: 13 }}>{error}</p>}

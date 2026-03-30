@@ -2,13 +2,13 @@
 import React, { memo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Sparkles, Calendar, MessageCircle, User } from 'lucide-react';
+import { Home, Sparkles, MessageCircle, Map, User } from 'lucide-react';
 
 const NAV = [
   { to: '/dashboard', icon: Home,          label: 'Home'    },
   { to: '/match',     icon: Sparkles,       label: 'Match'   },
-  { to: '/events',    icon: Calendar,       label: 'Events'  },
   { to: '/chats',     icon: MessageCircle,  label: 'Chats'   },
+  { to: '/map',       icon: Map,            label: 'Map'     },
   { to: '/profile',   icon: User,           label: 'Profile' },
 ];
 

@@ -2,30 +2,42 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, CalendarClock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSocket } from '../utils/socket';
 import { Avatar } from '../components/ui/UIKit';
+import MeetupScheduler from '../components/ui/MeetupScheduler';
 import api from '../utils/api';
 
 export default function ChatRoomPage() {
   const { roomId } = useParams();
   const { user }   = useAuth();
   const navigate   = useNavigate();
-  const [messages, setMessages]   = useState([]);
-  const [input, setInput]         = useState('');
-  const [typing, setTyping]       = useState(false);
-  const [otherUser, setOtherUser] = useState(null);
-  const [focused, setFocused]     = useState(false);
+  const [messages, setMessages]       = useState([]);
+  const [input, setInput]             = useState('');
+  const [typing, setTyping]           = useState(false);
+  const [otherUser, setOtherUser]     = useState(null);
+  const [matchId, setMatchId]         = useState(null);
+  const [focused, setFocused]         = useState(false);
+  const [showMeetup, setShowMeetup]   = useState(false);
   const bottomRef   = useRef();
   const typingTimer = useRef();
 
   useEffect(() => {
     api.get(`/chats/${roomId}`).then(r => {
       setMessages(r.data.messages || []);
-      const other = r.data.messages?.[0]?.sender;
-      if (other && other._id !== user._id) setOtherUser(other);
+      const other = r.data.messages?.find(m => m.sender?._id !== user._id)?.sender;
+      if (other) setOtherUser(other);
     }).catch(() => navigate('/chats'));
+
+    // Get matchId from rooms
+    api.get('/chats/rooms').then(r => {
+      const room = (r.data.rooms || []).find(rm => rm.roomId === roomId);
+      if (room) {
+        setMatchId(room.matchId);
+        if (!otherUser) setOtherUser(room.other);
+      }
+    }).catch(() => {});
 
     const socket = getSocket();
     socket.emit('join_room', roomId);
@@ -66,15 +78,20 @@ export default function ChatRoomPage() {
           <ArrowLeft size={18} color="#A8A3C7" />
         </motion.button>
         <Avatar name={otherUser?.name} size={36} />
-        <div>
-          <p style={{ fontSize: 15, fontWeight: 600, color: '#F1F0F7' }}>{otherUser?.name || 'SideKick'}</p>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 15, fontWeight: 600, color: '#F1F0F7', margin: 0 }}>{otherUser?.name || 'SideKick'}</p>
           <AnimatePresence>
             {typing && (
               <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                style={{ fontSize: 12, color: '#2DD4BF', fontWeight: 500 }}>typing...</motion.p>
+                style={{ fontSize: 12, color: '#2DD4BF', fontWeight: 500, margin: 0 }}>typing...</motion.p>
             )}
           </AnimatePresence>
         </div>
+        {/* Meetup button */}
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowMeetup(true)}
+          style={{ width: 36, height: 36, borderRadius: 10, background: '#2D2653', border: '1px solid #433B72', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+          <CalendarClock size={16} color="#2DD4BF" />
+        </motion.button>
       </motion.div>
 
       {/* Messages */}
@@ -119,6 +136,18 @@ export default function ChatRoomPage() {
           <Send size={18} color={input.trim() ? 'white' : '#4A4570'} />
         </motion.button>
       </motion.div>
+
+      {/* Meetup Scheduler Modal */}
+      <AnimatePresence>
+        {showMeetup && matchId && (
+          <MeetupScheduler
+            matchId={matchId}
+            otherUser={otherUser}
+            currentUserId={user._id}
+            onClose={() => setShowMeetup(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

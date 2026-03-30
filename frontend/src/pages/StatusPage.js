@@ -5,10 +5,11 @@ import AppLayout from '../layouts/AppLayout';
 import { PageHeader } from '../components/ui/UIKit';
 
 const SERVICES = [
-  { name: 'Backend API',        url: 'https://sidekick-be.vercel.app/health',                    icon: '⚡' },
-  { name: 'Smart Matching',     url: 'https://sidekick-microservice-2.onrender.com/health',       icon: '🤝' },
-  { name: 'Face Verification',  url: 'https://sidekick-py.onrender.com/health',                   icon: '🤳' },
-  { name: 'NLP Services',       url: 'https://sidekick-nlp-services.onrender.com/health',         icon: '🧠' },
+  { name: 'Backend API',        url: 'https://sidekick-be.vercel.app/health',                    icon: 'API' },
+  { name: 'Smart Matching',     url: 'https://sidekick-microservice-2.onrender.com/health',       icon: 'ML' },
+  { name: 'Face Verification',  url: 'https://sidekick-py.onrender.com/health',                   icon: 'FV' },
+  { name: 'NLP Services',       url: 'https://sidekick-nlp-services.onrender.com/health',         icon: 'NLP' },
+  { name: 'Safety Services',    url: 'https://sidekick-safety-services.onrender.com/health',      icon: 'SOS' },
 ];
 
 function ServiceCard({ name, icon, url }) {
@@ -37,7 +38,7 @@ function ServiceCard({ name, icon, url }) {
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       style={{ background: '#1A1535', border: '1px solid #2D2653', borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-      <span style={{ fontSize: 28 }}>{icon}</span>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg,#7C3AED,#2DD4BF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>{icon}</div>
       <div style={{ flex: 1 }}>
         <p style={{ fontSize: 15, fontWeight: 600, color: '#F1F0F7' }}>{name}</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>

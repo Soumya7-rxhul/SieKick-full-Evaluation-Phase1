@@ -18,6 +18,7 @@ import ChatRoomPage     from './pages/ChatRoomPage';
 import EventsPage       from './pages/EventsPage';
 import ProfilePage      from './pages/ProfilePage';
 import StatusPage       from './pages/StatusPage';
+import MapPage          from './pages/MapPage';
 
 const pv = {
   initial: { opacity: 0, y: 12, scale: 0.98 },
@@ -58,6 +59,7 @@ function AnimatedRoutes() {
         <Route path="/events"        element={<PrivateRoute><EventsPage /></PrivateRoute>} />
         <Route path="/profile"       element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/status"        element={<PrivateRoute><PW><StatusPage /></PW></PrivateRoute>} />
+        <Route path="/map"           element={<PrivateRoute><MapPage /></PrivateRoute>} />
         <Route path="*"              element={<Navigate to="/login" />} />
       </Routes>
     </AnimatePresence>

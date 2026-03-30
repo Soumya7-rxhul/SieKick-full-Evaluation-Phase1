@@ -18,7 +18,7 @@ export default function LoginPage() {
   const scooterCtrl = useAnimation();
 
   const [settled,   setSettled]   = useState(false);
-  const [email,     setEmail]     = useState('');
+  const [email,     setEmail]     = useState(() => localStorage.getItem('rememberedEmail') || '');
   const [password,  setPassword]  = useState('');
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState('');
@@ -29,32 +29,24 @@ export default function LoginPage() {
   // Micro-interaction: riders lean when password has value
   const ridersLean = password.length > 0;
 
-  const handleSubmit = useCallback(async (e) => {
+  const handleSubmit = useCallback(async (e, loginData) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      // Success — celebrate then drive off
+      const { data } = await api.post('/auth/login', loginData);
       setCelebrate(true);
       await new Promise(r => setTimeout(r, 600));
-      await scooterCtrl.start({
-        x: '110vw',
-        transition: { duration: 0.8, ease: [0.4, 0, 1, 1] },
-      });
+      await scooterCtrl.start({ x: '110vw', transition: { duration: 0.8, ease: [0.4, 0, 1, 1] } });
       login(data.accessToken, data.user);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Check your credentials.');
-      // Shake scooter on error
-      await scooterCtrl.start({
-        x: [-10, 10, -10, 10, -6, 6, 0],
-        transition: { duration: 0.5, ease: 'easeInOut' },
-      });
+      await scooterCtrl.start({ x: [-10, 10, -10, 10, -6, 6, 0], transition: { duration: 0.5, ease: 'easeInOut' } });
     } finally {
       setLoading(false);
     }
-  }, [email, password, login, navigate, scooterCtrl]);
+  }, [login, navigate, scooterCtrl]);
 
   return (
     <div style={{ minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', position: 'relative', overflow: 'hidden', fontFamily: 'Inter, sans-serif' }}>

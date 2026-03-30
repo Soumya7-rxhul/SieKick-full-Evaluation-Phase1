@@ -82,6 +82,8 @@ export default function MatchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(new Set());
+  const [showFilter, setShowFilter] = useState(false);
+  const [minScore, setMinScore] = useState(20);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -105,11 +107,28 @@ export default function MatchPage() {
     <AppLayout>
       <PageHeader title="Matches" subtitle="Sorted by compatibility"
         rightAction={
-          <button style={{ width: 36, height: 36, borderRadius: 12, background: '#2D2653', border: '1px solid #433B72', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <SlidersHorizontal size={18} color="#A8A3C7" />
-          </button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowFilter(f => !f)}
+            style={{ width: 36, height: 36, borderRadius: 12, background: showFilter ? 'linear-gradient(135deg,#7C3AED,#2DD4BF)' : '#2D2653', border: '1px solid #433B72', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <SlidersHorizontal size={18} color={showFilter ? 'white' : '#A8A3C7'} />
+          </motion.button>
         }
       />
+
+      <AnimatePresence>
+        {showFilter && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            style={{ overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ background: '#1A1535', borderRadius: 16, border: '1px solid #2D2653', padding: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#A8A3C7', marginBottom: 10 }}>Min Match Score: <span style={{ color: '#7C3AED', fontWeight: 700 }}>{minScore}%</span></p>
+              <input type="range" min={0} max={90} value={minScore} onChange={e => setMinScore(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#7C3AED' }} />
+              <p style={{ fontSize: 12, color: '#6E6893', marginTop: 6 }}>
+                Showing {suggestions.filter(s => s.totalScore >= minScore).length} of {suggestions.length} matches
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {loading && <SkeletonList count={3} height={220} />}
 
@@ -131,7 +150,7 @@ export default function MatchPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {suggestions.map(({ user, totalScore, interestScore, availabilityScore, distanceScore }, i) => (
+        {suggestions.filter(s => s.totalScore >= minScore).map(({ user, totalScore, interestScore, availabilityScore, distanceScore }, i) => (
           <MatchCard key={user._id} user={user} totalScore={totalScore} interestScore={interestScore}
             availabilityScore={availabilityScore} distanceScore={distanceScore}
             sent={sent.has(user._id)} onSend={() => sendRequest(user._id)} delay={i * 0.07} />

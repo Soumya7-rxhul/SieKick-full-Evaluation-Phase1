@@ -1,7 +1,8 @@
 // src/pages/EventsPage.js
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, MapPin, Users, Plus, X } from 'lucide-react';
+import { Calendar, MapPin, Users, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import AppLayout from '../layouts/AppLayout';
 import { EmptyState, SkeletonList, CategoryChip, TabBar, PageHeader, GradientButton } from '../components/ui/UIKit';
@@ -11,7 +12,9 @@ const sp = { type: 'spring', stiffness: 300, damping: 28 };
 const CATEGORIES = ['All', 'movie', 'sports', 'food', 'music', 'hangout', 'study'];
 const TABS = [{ key: 'browse', label: 'Browse' }, { key: 'mine', label: 'My Events' }];
 
-function EventCard({ event, joined, onJoin, showJoin, delay = 0 }) {
+function EventCard({ event, joined, onJoin, onEdit, onDelete, currentUserId, delay = 0 }) {
+  const isCreator = event.creator?._id === currentUserId || event.creator === currentUserId;
+  const isJoined = joined.has(event._id) || event.participants?.some(p => p === currentUserId || p?._id === currentUserId);
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ ...sp, delay }}
       whileHover={{ y: -2, boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(124,58,237,0.08)' }}
@@ -43,21 +46,38 @@ function EventCard({ event, joined, onJoin, showJoin, delay = 0 }) {
         </div>
       </div>
       {event.creator && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
-          <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, #7C3AED, #2DD4BF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white' }}>
-            {event.creator.name?.[0]}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, #7C3AED, #2DD4BF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white' }}>
+              {event.creator.name?.[0]}
+            </div>
+            <span style={{ fontSize: 12, color: '#6E6893' }}>by {event.creator.name}</span>
           </div>
-          <span style={{ fontSize: 12, color: '#6E6893' }}>by {event.creator.name}</span>
+          {isCreator && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={() => onEdit(event)}
+                style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <Edit2 size={12} color="#7C3AED" />
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={() => onDelete(event._id)}
+                style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <Trash2 size={12} color="#F87171" />
+              </motion.button>
+            </div>
+          )}
         </div>
       )}
-      {showJoin && event.isOpen && (
+      {!isCreator && event.isOpen && (
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-          onClick={() => !joined.has(event._id) && onJoin(event._id)} disabled={joined.has(event._id)}
-          style={{ marginTop: 14, width: '100%', height: 40, background: 'transparent', color: joined.has(event._id) ? '#34D399' : '#2DD4BF', border: `1.5px solid ${joined.has(event._id) ? 'rgba(52,211,153,0.3)' : '#2DD4BF'}`, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: joined.has(event._id) ? 'default' : 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
-          {joined.has(event._id) ? 'Joined' : 'Join Event'}
+          onClick={() => !isJoined && onJoin(event._id)} disabled={isJoined}
+          style={{ marginTop: 14, width: '100%', height: 40, background: 'transparent', color: isJoined ? '#34D399' : '#2DD4BF', border: `1.5px solid ${isJoined ? 'rgba(52,211,153,0.3)' : '#2DD4BF'}`, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: isJoined ? 'default' : 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
+          {isJoined ? 'Joined' : 'Join Event'}
         </motion.button>
       )}
-      {!event.isOpen && (
+      {isCreator && (
+        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: '#7C3AED', padding: '8px', background: 'rgba(124,58,237,0.08)', borderRadius: 8, fontWeight: 600 }}>Your Event</div>
+      )}
+      {!isCreator && !event.isOpen && (
         <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: '#6E6893', padding: '8px', background: '#231E42', borderRadius: 8 }}>Event is full</div>
       )}
     </motion.div>
@@ -65,6 +85,7 @@ function EventCard({ event, joined, onJoin, showJoin, delay = 0 }) {
 }
 
 export default function EventsPage() {
+  const { user } = useAuth();
   const [events, setEvents]         = useState([]);
   const [myEvents, setMyEvents]     = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -72,6 +93,7 @@ export default function EventsPage() {
   const [category, setCategory]     = useState('All');
   const [joined, setJoined]         = useState(new Set());
   const [showCreate, setShowCreate] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', category: 'hangout', date: '', timeSlot: 'evening', city: '', venue: '' });
   const [creating, setCreating]     = useState(false);
 
@@ -95,16 +117,38 @@ export default function EventsPage() {
     } catch (err) { toast.error(err.response?.data?.message || 'Could not join event'); }
   };
 
-  const createEvent = async () => {
+  const deleteEvent = async (eventId) => {
+    try {
+      await api.delete(`/events/${eventId}`);
+      fetchEvents();
+      api.get('/events/mine').then(r => setMyEvents(r.data.events || []));
+      toast.success('Event deleted!');
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to delete'); }
+  };
+
+  const startEdit = (event) => {
+    setEditingEvent(event._id);
+    setForm({ title: event.title, description: event.description || '', category: event.category, date: event.date?.split('T')[0] || '', timeSlot: event.timeSlot || 'evening', city: event.location?.city || '', venue: event.location?.venue || '' });
+    setShowCreate(true);
+  };
+
+  const saveEvent = async () => {
     if (!form.title || !form.date) return toast.error('Title and date are required');
     setCreating(true);
     try {
-      await api.post('/events', { ...form, location: { city: form.city, venue: form.venue } });
+      if (editingEvent) {
+        await api.put(`/events/${editingEvent}`, { ...form, location: { city: form.city, venue: form.venue } });
+        toast.success('Event updated!');
+      } else {
+        await api.post('/events', { ...form, location: { city: form.city, venue: form.venue } });
+        toast.success('Event created!');
+      }
       setShowCreate(false);
+      setEditingEvent(null);
       setForm({ title: '', description: '', category: 'hangout', date: '', timeSlot: 'evening', city: '', venue: '' });
       fetchEvents();
-      toast.success('Event created!');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed to create event'); }
+      api.get('/events/mine').then(r => setMyEvents(r.data.events || []));
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to save'); }
     finally { setCreating(false); }
   };
 
@@ -126,7 +170,7 @@ export default function EventsPage() {
         {showCreate && (
           <motion.div key="create-form" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }} style={{ overflow: 'hidden', marginBottom: 20 }}>
             <div style={{ background: '#1A1535', borderRadius: 20, border: '1px solid #2D2653', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', padding: 20 }}>
-              <p style={{ fontSize: 15, fontWeight: 600, color: '#F1F0F7', marginBottom: 14 }}>Create Event</p>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#F1F0F7', marginBottom: 14 }}>{editingEvent ? 'Edit Event' : 'Create Event'}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <input style={inputStyle} placeholder="Event title *" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
                 <textarea style={{ ...inputStyle, height: 'auto', padding: '10px 14px', resize: 'none' }} placeholder="Description (optional)" rows={2} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
@@ -141,9 +185,9 @@ export default function EventsPage() {
                 <input style={inputStyle} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} min={new Date().toISOString().split('T')[0]} />
                 <input style={inputStyle} placeholder="City" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
                 <input style={inputStyle} placeholder="Venue (optional)" value={form.venue} onChange={e => setForm({ ...form, venue: e.target.value })} />
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={createEvent} disabled={creating}
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={saveEvent} disabled={creating}
                   style={{ height: 44, background: 'linear-gradient(135deg, #7C3AED, #2DD4BF)', color: 'white', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>
-                  {creating ? <span style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.65s linear infinite', display: 'inline-block' }} /> : 'Create Event'}
+                  {creating ? <span style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.65s linear infinite', display: 'inline-block' }} /> : editingEvent ? 'Save Changes' : 'Create Event'}
                 </motion.button>
               </div>
             </div>
@@ -164,7 +208,7 @@ export default function EventsPage() {
                 <EmptyState icon={Calendar} title="No events found" subtitle="Be the first to create one!" action="Create Event" onAction={() => setShowCreate(true)} />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {events.map((e, i) => <EventCard key={e._id} event={e} joined={joined} onJoin={joinEvent} showJoin delay={i * 0.06} />)}
+                  {events.map((e, i) => <EventCard key={e._id} event={e} joined={joined} onJoin={joinEvent} onEdit={startEdit} onDelete={deleteEvent} currentUserId={user?._id} delay={i * 0.06} />)}
                 </div>
               )
             }
@@ -176,7 +220,7 @@ export default function EventsPage() {
               <EmptyState icon={Calendar} title="No events yet" subtitle="Join or create an event to see it here" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {myEvents.map((e, i) => <EventCard key={e._id} event={e} joined={joined} onJoin={joinEvent} showJoin={false} delay={i * 0.06} />)}
+                {myEvents.map((e, i) => <EventCard key={e._id} event={e} joined={joined} onJoin={joinEvent} onEdit={startEdit} onDelete={deleteEvent} currentUserId={user?._id} delay={i * 0.06} />)}
               </div>
             )}
           </motion.div>
