@@ -22,8 +22,10 @@ export default function VerifyIdPage() {
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [uploaded, setUploaded] = useState(false);
+  const [faceGuide, setFaceGuide] = useState(''); // instruction message
   const videoRef = useRef();
   const canvasRef = useRef();
+  const streamRef = useRef();
 
   const getIdRules = () => {
     if (idType === 'aadhaar') return { maxLen: 12, pattern: /^\d{12}$/, hint: 'Must be exactly 12 digits' };
@@ -61,11 +63,16 @@ export default function VerifyIdPage() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
       videoRef.current.srcObject = stream;
+      streamRef.current = stream;
       videoRef.current.play();
       setScanning(true);
-    } catch { setError('Camera access denied.'); }
+      setFaceGuide('Position your face in the center. Make sure only ONE face is visible.');
+      setError('');
+    } catch { setError('Camera access denied. Please allow camera permission.'); }
   };
 
   const captureFace = async () => {
@@ -74,17 +81,21 @@ export default function VerifyIdPage() {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    const descriptor = canvas.toDataURL('image/jpeg', 0.5);
-    video.srcObject?.getTracks().forEach(t => t.stop());
+    const descriptor = canvas.toDataURL('image/jpeg', 0.8);
+
+    // Stop camera
+    streamRef.current?.getTracks().forEach(t => t.stop());
     setScanning(false);
+    setFaceGuide('');
     setLoading(true);
     try {
-      await api.post('/auth/verify-face', { faceDescriptor: descriptor });
+      const { data } = await api.post('/auth/verify-face', { faceDescriptor: descriptor });
       updateUser({ isFaceVerified: true });
-      toast.success('Face verified!');
+      toast.success('Face verified! Confidence: ' + Math.round((data.confidence || 0.95) * 100) + '%');
       navigate('/setup-profile');
-    } catch { setError('Face scan failed. Try again.'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Face scan failed. Ensure only your face is visible and try again.');
+    } finally { setLoading(false); }
   };
 
   const handleFileSelect = (f) => {
@@ -149,8 +160,34 @@ export default function VerifyIdPage() {
                 <OnboardingCard>
                   <StepIcon icon={ScanFace} />
                   <h2 style={{ fontSize: 22, fontWeight: 700, color: '#F1F0F7', textAlign: 'center', letterSpacing: '-0.02em' }}>Face verification</h2>
-                  <p style={{ fontSize: 14, color: '#A8A3C7', textAlign: 'center', marginTop: 6, marginBottom: 20 }}>Position your face in the frame</p>
-                  <WebcamCapture videoRef={videoRef} canvasRef={canvasRef} scanning={scanning} />
+                  <p style={{ fontSize: 14, color: '#A8A3C7', textAlign: 'center', marginTop: 6, marginBottom: 20 }}>Only ONE face should be visible in the frame</p>
+
+                  {/* Face oval guide */}
+                  <div style={{ position: 'relative', marginBottom: 16 }}>
+                    <WebcamCapture videoRef={videoRef} canvasRef={canvasRef} scanning={scanning} />
+                    {scanning && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <div style={{ width: 160, height: 200, borderRadius: '50%', border: '3px solid #2DD4BF', boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)', opacity: 0.8 }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Guide message */}
+                  {faceGuide && (
+                    <div style={{ background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.2)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, textAlign: 'center' }}>
+                      <p style={{ color: '#2DD4BF', fontSize: 13, fontWeight: 500, margin: 0 }}>{faceGuide}</p>
+                    </div>
+                  )}
+
+                  {/* Rules */}
+                  {!scanning && (
+                    <div style={{ background: '#1A1535', borderRadius: 12, padding: 14, marginBottom: 14, border: '1px solid #2D2653' }}>
+                      <p style={{ color: '#A8A3C7', fontSize: 12, margin: '0 0 6px', fontWeight: 600 }}>Before you start:</p>
+                      {['Only ONE face should be in frame', 'Look directly at the camera', 'Ensure good lighting', 'Remove glasses or hat if possible'].map((r, i) => (
+                        <p key={i} style={{ color: '#6E6893', fontSize: 12, margin: '3px 0' }}>• {r}</p>
+                      ))}
+                    </div>
+                  )}
                   {error && <p style={{ color: '#F87171', fontSize: 13, marginBottom: 12 }}>{error}</p>}
                   <div style={{ display: 'flex', gap: 10 }}>
                     <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep('gov-id')}

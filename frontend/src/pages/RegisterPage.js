@@ -16,11 +16,20 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const handlePhoneChange = (e) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setForm({ ...form, phone: val });
+  };
+
   const handle = async (e) => {
     e.preventDefault();
+    if (form.phone.length !== 10) {
+      setError('Phone number must be exactly 10 digits');
+      return;
+    }
     setLoading(true); setError('');
     try {
-      await api.post('/auth/register', form);
+      await api.post('/auth/register', { ...form });
       toast.success('Account created!');
       navigate('/verify-otp', { state: { phone: form.phone } });
     } catch (err) {
@@ -31,7 +40,6 @@ export default function RegisterPage() {
   const fields = [
     { key: 'name',     icon: User,       label: 'Full Name', type: 'text',     placeholder: 'Arjun Sharma' },
     { key: 'email',    icon: Mail,       label: 'Email',     type: 'email',    placeholder: 'you@email.com' },
-    { key: 'phone',    icon: Smartphone, label: 'Phone',     type: 'tel',      placeholder: '+91 98765 43210' },
     { key: 'password', icon: Lock,       label: 'Password',  type: 'password', placeholder: 'Min 8 characters' },
   ];
 
@@ -64,6 +72,18 @@ export default function RegisterPage() {
                   value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} required />
               </motion.div>
             ))}
+
+            {/* Phone field - strictly 10 digits */}
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ ...sp, delay: 0.08 * 2 + 0.2 }}>
+              <AnimatedInput icon={Smartphone} label="Phone" type="tel" placeholder="10-digit mobile number"
+                value={form.phone} onChange={handlePhoneChange} required />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, paddingLeft: 4 }}>
+                <span style={{ fontSize: 11, color: '#6E6893' }}>Only digits, no spaces or symbols</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: form.phone.length === 10 ? '#34D399' : '#6E6893' }}>
+                  {form.phone.length}/10
+                </span>
+              </div>
+            </motion.div>
 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
               <GradientButton type="submit" loading={loading} fullWidth>Create Account</GradientButton>

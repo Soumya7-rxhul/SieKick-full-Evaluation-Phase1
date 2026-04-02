@@ -1,7 +1,7 @@
 // src/pages/EventsPage.js
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, MapPin, Users, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, MapPin, Users, Plus, X, Edit2, Trash2, Film, Dumbbell, UtensilsCrossed, BookOpen, Coffee, Music2, Car, ShoppingBag, Gamepad2, Moon, Plane, Camera, Ticket, PartyPopper, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import AppLayout from '../layouts/AppLayout';
@@ -9,46 +9,105 @@ import { EmptyState, SkeletonList, CategoryChip, TabBar, PageHeader, GradientBut
 import api from '../utils/api';
 
 const sp = { type: 'spring', stiffness: 300, damping: 28 };
-const CATEGORIES = ['All', 'movie', 'sports', 'food', 'music', 'hangout', 'study'];
+
+const ACTIVITY_META = {
+  movie:        { icon: Film,           color: '#F472B6', bg: 'rgba(244,114,182,0.12)' },
+  sports:       { icon: Dumbbell,       color: '#34D399', bg: 'rgba(52,211,153,0.12)'  },
+  food:         { icon: UtensilsCrossed,color: '#FB923C', bg: 'rgba(251,146,60,0.12)'  },
+  study:        { icon: BookOpen,       color: '#60A5FA', bg: 'rgba(96,165,250,0.12)'  },
+  hangout:      { icon: Handshake,      color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' },
+  music:        { icon: Music2,         color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
+  drive:        { icon: Car,            color: '#2DD4BF', bg: 'rgba(45,212,191,0.12)'  },
+  cafe:         { icon: Coffee,         color: '#D97706', bg: 'rgba(217,119,6,0.12)'   },
+  shopping:     { icon: ShoppingBag,    color: '#EC4899', bg: 'rgba(236,72,153,0.12)'  },
+  gaming:       { icon: Gamepad2,       color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)'  },
+  nightwalk:    { icon: Moon,           color: '#818CF8', bg: 'rgba(129,140,248,0.12)' },
+  travel:       { icon: Plane,          color: '#06B6D4', bg: 'rgba(6,182,212,0.12)'   },
+  fitness:      { icon: Dumbbell,       color: '#10B981', bg: 'rgba(16,185,129,0.12)'  },
+  photography:  { icon: Camera,         color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
+  concert:      { icon: Ticket,         color: '#C084FC', bg: 'rgba(192,132,252,0.12)' },
+  festival:     { icon: PartyPopper,    color: '#FBBF24', bg: 'rgba(251,191,36,0.12)'  },
+};
+
+const ACTIVITY_LABELS = {
+  movie: 'Movie', sports: 'Sports', food: 'Food', study: 'Study', hangout: 'Hangout',
+  music: 'Music', drive: 'Drive / Long Drive', cafe: 'Cafe Meetup', shopping: 'Shopping',
+  gaming: 'Gaming', nightwalk: 'Night Walk', travel: 'Travel / Weekend Trip',
+  fitness: 'Fitness / Gym', photography: 'Photography', concert: 'Concert / Show', festival: 'Festival / Local Event',
+};
+
+const CATEGORIES = ['All', ...Object.keys(ACTIVITY_META)];
 const TABS = [{ key: 'browse', label: 'Browse' }, { key: 'mine', label: 'My Events' }];
+
+function ActivityBadge({ category }) {
+  const meta = ACTIVITY_META[category] || { icon: Handshake, color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' };
+  const Icon = meta.icon;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: meta.bg, border: `1px solid ${meta.color}30` }}>
+      <Icon size={11} color={meta.color} />
+      <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {ACTIVITY_LABELS[category] || category}
+      </span>
+    </div>
+  );
+}
 
 function EventCard({ event, joined, onJoin, onEdit, onDelete, currentUserId, delay = 0 }) {
   const isCreator = event.creator?._id === currentUserId || event.creator === currentUserId;
-  const isJoined = joined.has(event._id) || event.participants?.some(p => p === currentUserId || p?._id === currentUserId);
+  const isJoined  = joined.has(event._id) || event.participants?.some(p => p === currentUserId || p?._id === currentUserId);
+  const total      = event.participants?.length || 0;
+  const max        = event.maxParticipants || 2;
+  const isFull     = !event.isOpen || total >= max;
+  const spotsLeft  = Math.max(0, max - total);
+  const meta       = ACTIVITY_META[event.category] || { icon: Handshake, color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' };
+  const ActivityIcon = meta.icon;
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ ...sp, delay }}
       whileHover={{ y: -2, boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(124,58,237,0.08)' }}
       style={{ background: '#1A1535', borderRadius: 20, border: '1px solid #2D2653', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', padding: 16, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.25s ease' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #7C3AED, #2DD4BF)', borderRadius: '20px 20px 0 0' }} />
+      {/* top accent bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${meta.color}, #2DD4BF)`, borderRadius: '20px 20px 0 0' }} />
+
+      {/* header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <div style={{ flex: 1, paddingRight: 8 }}>
-          <p style={{ fontSize: 16, fontWeight: 600, color: '#F1F0F7' }}>{event.title}</p>
-          {event.description && <p style={{ fontSize: 13, color: '#A8A3C7', marginTop: 3, lineHeight: 1.5 }}>{event.description}</p>}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, paddingRight: 8 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+            <ActivityIcon size={18} color={meta.color} />
+          </div>
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 600, color: '#F1F0F7', lineHeight: 1.3 }}>{event.title}</p>
+            {event.description && <p style={{ fontSize: 12, color: '#A8A3C7', marginTop: 3, lineHeight: 1.5 }}>{event.description}</p>}
+          </div>
         </div>
-        <span style={{ padding: '2px 10px', borderRadius: 20, background: 'rgba(124,58,237,0.15)', color: '#7C3AED', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0, border: '1px solid rgba(124,58,237,0.2)' }}>
-          {event.category}
-        </span>
+        <ActivityBadge category={event.category} />
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+
+      {/* meta row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Calendar size={13} color="#6E6893" />
-          <span style={{ fontSize: 13, color: '#A8A3C7' }}>{new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {event.timeSlot}</span>
+          <Calendar size={12} color="#6E6893" />
+          <span style={{ fontSize: 12, color: '#A8A3C7' }}>{new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {event.timeSlot}</span>
         </div>
         {event.location?.city && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <MapPin size={13} color="#6E6893" />
-            <span style={{ fontSize: 13, color: '#A8A3C7' }}>{event.location.city}{event.location.venue ? `, ${event.location.venue}` : ''}</span>
+            <MapPin size={12} color="#6E6893" />
+            <span style={{ fontSize: 12, color: '#A8A3C7' }}>{event.location.city}{event.location.venue ? `, ${event.location.venue}` : ''}</span>
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Users size={13} color="#6E6893" />
-          <span style={{ fontSize: 13, color: '#A8A3C7' }}>{event.participants?.length || 0}/{event.maxParticipants}</span>
+          <Users size={12} color={isFull ? '#F87171' : '#6E6893'} />
+          <span style={{ fontSize: 12, color: isFull ? '#F87171' : '#A8A3C7', fontWeight: isFull ? 600 : 400 }}>
+            {total} / {max} joined{!isFull && ` · ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left`}
+          </span>
         </div>
       </div>
+
+      {/* creator row */}
       {event.creator && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, #7C3AED, #2DD4BF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white' }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: `linear-gradient(135deg, ${meta.color}, #2DD4BF)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white' }}>
               {event.creator.name?.[0]}
             </div>
             <span style={{ fontSize: 12, color: '#6E6893' }}>by {event.creator.name}</span>
@@ -67,18 +126,18 @@ function EventCard({ event, joined, onJoin, onEdit, onDelete, currentUserId, del
           )}
         </div>
       )}
-      {!isCreator && event.isOpen && (
+
+      {/* action button */}
+      {isCreator ? (
+        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: meta.color, padding: '8px', background: meta.bg, borderRadius: 8, fontWeight: 600 }}>Your Event</div>
+      ) : isFull ? (
+        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: '#6E6893', padding: '8px', background: '#231E42', borderRadius: 8, fontWeight: 500 }}>Event Full</div>
+      ) : (
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
           onClick={() => !isJoined && onJoin(event._id)} disabled={isJoined}
-          style={{ marginTop: 14, width: '100%', height: 40, background: 'transparent', color: isJoined ? '#34D399' : '#2DD4BF', border: `1.5px solid ${isJoined ? 'rgba(52,211,153,0.3)' : '#2DD4BF'}`, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: isJoined ? 'default' : 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
-          {isJoined ? 'Joined' : 'Join Event'}
+          style={{ marginTop: 14, width: '100%', height: 40, background: isJoined ? 'rgba(52,211,153,0.08)' : 'transparent', color: isJoined ? '#34D399' : '#2DD4BF', border: `1.5px solid ${isJoined ? 'rgba(52,211,153,0.3)' : '#2DD4BF'}`, borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: isJoined ? 'default' : 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s' }}>
+          {isJoined ? '✓ Joined' : 'Join Event'}
         </motion.button>
-      )}
-      {isCreator && (
-        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: '#7C3AED', padding: '8px', background: 'rgba(124,58,237,0.08)', borderRadius: 8, fontWeight: 600 }}>Your Event</div>
-      )}
-      {!isCreator && !event.isOpen && (
-        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12, color: '#6E6893', padding: '8px', background: '#231E42', borderRadius: 8 }}>Event is full</div>
       )}
     </motion.div>
   );
@@ -94,7 +153,7 @@ export default function EventsPage() {
   const [joined, setJoined]         = useState(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', category: 'hangout', date: '', timeSlot: 'evening', city: '', venue: '' });
+  const [form, setForm] = useState({ title: '', description: '', category: 'hangout', date: '', timeSlot: 'evening', city: '', venue: '', maxParticipants: 2 });
   const [creating, setCreating]     = useState(false);
 
   const fetchEvents = () => {
@@ -128,7 +187,7 @@ export default function EventsPage() {
 
   const startEdit = (event) => {
     setEditingEvent(event._id);
-    setForm({ title: event.title, description: event.description || '', category: event.category, date: event.date?.split('T')[0] || '', timeSlot: event.timeSlot || 'evening', city: event.location?.city || '', venue: event.location?.venue || '' });
+    setForm({ title: event.title, description: event.description || '', category: event.category, date: event.date?.split('T')[0] || '', timeSlot: event.timeSlot || 'evening', city: event.location?.city || '', venue: event.location?.venue || '', maxParticipants: event.maxParticipants || 2 });
     setShowCreate(true);
   };
 
@@ -145,7 +204,7 @@ export default function EventsPage() {
       }
       setShowCreate(false);
       setEditingEvent(null);
-      setForm({ title: '', description: '', category: 'hangout', date: '', timeSlot: 'evening', city: '', venue: '' });
+      setForm({ title: '', description: '', category: 'hangout', date: '', timeSlot: 'evening', city: '', venue: '', maxParticipants: 2 });
       fetchEvents();
       api.get('/events/mine').then(r => setMyEvents(r.data.events || []));
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to save'); }
@@ -176,13 +235,27 @@ export default function EventsPage() {
                 <textarea style={{ ...inputStyle, height: 'auto', padding: '10px 14px', resize: 'none' }} placeholder="Description (optional)" rows={2} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                    {['movie','sports','food','music','hangout','study'].map(c => <option key={c} value={c} style={{ background: '#1A1535' }}>{c}</option>)}
+                    {Object.entries(ACTIVITY_LABELS).map(([val, label]) => (
+                      <option key={val} value={val} style={{ background: '#1A1535' }}>{label}</option>
+                    ))}
                   </select>
                   <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.timeSlot} onChange={e => setForm({ ...form, timeSlot: e.target.value })}>
                     {['morning','afternoon','evening','night'].map(s => <option key={s} value={s} style={{ background: '#1A1535' }}>{s}</option>)}
                   </select>
                 </div>
-                <input style={inputStyle} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} min={new Date().toISOString().split('T')[0]} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <input style={inputStyle} type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} min={new Date().toISOString().split('T')[0]} />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      style={{ ...inputStyle, paddingRight: 40 }}
+                      type="number" min={2} max={50}
+                      placeholder="Max participants"
+                      value={form.maxParticipants}
+                      onChange={e => setForm({ ...form, maxParticipants: Math.min(50, Math.max(2, Number(e.target.value))) })}
+                    />
+                    <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#6E6893', pointerEvents: 'none' }}>max</span>
+                  </div>
+                </div>
                 <input style={inputStyle} placeholder="City" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
                 <input style={inputStyle} placeholder="Venue (optional)" value={form.venue} onChange={e => setForm({ ...form, venue: e.target.value })} />
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={saveEvent} disabled={creating}
@@ -201,7 +274,17 @@ export default function EventsPage() {
         {tab === 'browse' && (
           <motion.div key="browse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16, scrollbarWidth: 'none' }}>
-              {CATEGORIES.map(c => <CategoryChip key={c} label={c} active={category === c} onClick={() => setCategory(c)} />)}
+              {CATEGORIES.map(c => {
+                const meta = ACTIVITY_META[c];
+                const Icon = meta?.icon;
+                return (
+                  <button key={c} onClick={() => setCategory(c)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 20, border: `1.5px solid ${category === c ? (meta?.color || '#2DD4BF') : '#2D2653'}`, background: category === c ? (meta?.bg || 'rgba(45,212,191,0.12)') : 'transparent', color: category === c ? (meta?.color || '#2DD4BF') : '#6E6893', fontSize: 12, fontWeight: category === c ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'Inter, sans-serif', transition: 'all 0.2s', flexShrink: 0 }}>
+                    {Icon && <Icon size={11} />}
+                    {c === 'All' ? 'All' : ACTIVITY_LABELS[c] || c}
+                  </button>
+                );
+              })}
             </div>
             {loading ? <SkeletonList count={3} height={160} /> :
               events.length === 0 ? (
