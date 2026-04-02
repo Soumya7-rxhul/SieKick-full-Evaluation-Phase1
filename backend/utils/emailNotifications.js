@@ -114,6 +114,34 @@ exports.sendEventJoinedEmail = async (creatorEmail, creatorName, joinerName, eve
   }
 };
 
+// ── EVENT REMINDER ────────────────────────────────────────────
+exports.sendEventReminderEmail = async (userEmail, userName, eventTitle, eventDate, eventCity, eventVenue, hoursLeft) => {
+  try {
+    const isUrgent = hoursLeft <= 1;
+    const timeText = isUrgent ? 'in 1 hour' : 'tomorrow';
+    await transporter.sendMail({
+      from: `"SideKick" <${process.env.GMAIL_USER}>`,
+      to: userEmail,
+      subject: `Reminder: "${eventTitle}" is ${timeText}!`,
+      html: base(`
+        <h2 style="color:#F1F0F7;margin-top:0">${isUrgent ? 'Starting Soon!' : 'Event Tomorrow!'}</h2>
+        <p style="color:#A8A3C7">Hey <b style="color:#F1F0F7">${userName}</b>,</p>
+        <p style="color:#A8A3C7">Don't forget! <b style="color:#2DD4BF">"${eventTitle}"</b> is happening ${timeText}.</p>
+        <div style="background:#1A1535;border:1px solid #2D2653;border-radius:12px;padding:16px;margin:16px 0">
+          <p style="margin:4px 0;color:#A8A3C7"><b style="color:#F1F0F7">Date:</b> ${new Date(eventDate).toDateString()}</p>
+          <p style="margin:4px 0;color:#A8A3C7"><b style="color:#F1F0F7">Time:</b> ${new Date(eventDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          ${eventCity ? `<p style="margin:4px 0;color:#A8A3C7"><b style="color:#F1F0F7">City:</b> ${eventCity}</p>` : ''}
+          ${eventVenue ? `<p style="margin:4px 0;color:#A8A3C7"><b style="color:#F1F0F7">Venue:</b> ${eventVenue}</p>` : ''}
+        </div>
+        <p style="color:#A8A3C7">Get ready and have a great time with your SideKick!</p>
+        ${btn('View Event', `${APP_URL}/events`)}
+      `),
+    });
+  } catch (err) {
+    console.warn('Event reminder email failed:', err.message);
+  }
+};
+
 // ── EVENT JOIN CONFIRMATION (to joiner) ──────────────────
 exports.sendEventJoinConfirmEmail = async (joinerEmail, joinerName, eventTitle, eventDate, eventCity) => {
   try {

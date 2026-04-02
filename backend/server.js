@@ -11,6 +11,7 @@ const chatRoutes = require('./routes/chats');
 const reportRoutes = require('./routes/reports');
 const safetyRoutes = require('./routes/safety');
 const meetupRoutes = require('./routes/meetups');
+const { startReminderScheduler } = require('./utils/reminderScheduler');
 
 const app = express();
 
@@ -33,6 +34,9 @@ const ensureDB = async (req, res, next) => {
 
 app.get('/', (req, res) => res.json({ status: 'ok', service: 'sidekick-backend', message: 'SideKick API is running 🤝' }));
 app.get('/health', (req, res) => res.json({ status: 'ok', mongo_uri_set: !!process.env.MONGO_URI, jwt_secret_set: !!process.env.JWT_SECRET }));
+
+// Start reminder scheduler
+if (require.main === module) startReminderScheduler();
 
 app.use('/api/auth', ensureDB, authRoutes);
 app.use('/api/users', ensureDB, userRoutes);
