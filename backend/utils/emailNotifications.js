@@ -67,6 +67,33 @@ exports.sendMatchAcceptedEmail = async (requesterEmail, requesterName, receiverN
   }
 };
 
+// ── MATCH REQUEST REJECTED ────────────────────────────────
+exports.sendMatchRejectedEmail = async (requesterEmail, requesterName, receiverName) => {
+  try {
+    await transporter.sendMail({
+      from: `"SideKick" <${process.env.GMAIL_USER}>`,
+      to: requesterEmail,
+      subject: `Keep going! There are more SideKicks waiting for you`,
+      html: base(`
+        <h2 style="color:#F1F0F7;margin-top:0">Don't give up!</h2>
+        <p style="color:#A8A3C7">Hey <b style="color:#F1F0F7">${requesterName}</b>,</p>
+        <p style="color:#A8A3C7"><b style="color:#2DD4BF">${receiverName}</b> wasn't available to connect this time — but that's okay!</p>
+        <p style="color:#A8A3C7">There are plenty of amazing SideKicks out there who share your interests. Keep exploring!</p>
+        <div style="background:#1A1535;border:1px solid #2D2653;border-radius:12px;padding:16px;margin:16px 0">
+          <p style="color:#2DD4BF;font-weight:700;margin:0 0 8px">Tips to find your perfect SideKick:</p>
+          <p style="color:#A8A3C7;margin:4px 0;font-size:13px">• Complete your profile with more interests</p>
+          <p style="color:#A8A3C7;margin:4px 0;font-size:13px">• Set your availability schedule</p>
+          <p style="color:#A8A3C7;margin:4px 0;font-size:13px">• Join local events to meet more people</p>
+          <p style="color:#A8A3C7;margin:4px 0;font-size:13px">• Try connecting with verified users</p>
+        </div>
+        ${btn('Find New SideKicks', `${APP_URL}/match`)}
+      `),
+    });
+  } catch (err) {
+    console.warn('Match rejected email failed:', err.message);
+  }
+};
+
 // ── EVENT JOINED (to creator) ─────────────────────────────
 exports.sendEventJoinedEmail = async (creatorEmail, creatorName, joinerName, eventTitle) => {
   try {

@@ -6,6 +6,31 @@ const { generateTokens } = require('../middleware/auth');
 
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 'http://localhost:8001';
 
+// Send OTP via SMS (Fast2SMS) + Email
+const sendOtp = async (phone, email, otp, name) => {
+  // Send SMS via Fast2SMS
+  try {
+    const phoneClean = phone.replace(/\D/g, '').slice(-10);
+    await axios.post('https://www.fast2sms.com/dev/bulkV2', {
+      route: 'otp',
+      variables_values: otp,
+      numbers: phoneClean,
+    }, {
+      headers: { authorization: process.env.FAST2SMS_API_KEY },
+      timeout: 5000,
+    });
+    console.log(`SMS OTP sent to ${phoneClean}`);
+  } catch (err) {
+    console.warn('SMS failed:', err.message);
+  }
+  // Always send email as backup
+  try {
+    await sendOtpEmail(email, otp, name);
+  } catch (err) {
+    console.warn('Email OTP failed:', err.message);
+  }
+};
+
 const sanitize = (user) => {
   const u = user.toObject ? user.toObject() : { ...user };
   delete u.passwordHash;
@@ -44,11 +69,21 @@ exports.register = async (req, res) => {
 
     const phoneClean = phone.replace(/\s/g, '');
     if (!/^\+?[\d]{10,15}$/.test(phoneClean))
-      return res.status(400).json({ message: 'Invalid phone number format' });
+      return res.status(400).json({ message: 'Phone must be 10 digits' });
 
     const existing = await User.findOne({ $or: [{ email }, { phone: phoneClean }] });
-    if (existing)
+    if (existing) {
+      // If exists but not verified, resend OTP instead of error
+      if (!existing.isPhoneVerified) {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        existing.otpCode = otp;
+        existing.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        await existing.save();
+        await sendOtp(existing.phone, existing.email, otp, existing.name);
+        return res.status(200).json({ message: 'OTP sent to your phone and email.', userId: existing._id, phone: existing.phone });
+      }
       return res.status(400).json({ message: 'Email or phone already registered' });
+    }
 
     const passwordHash = await bcrypt.hash(password, 12);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -56,9 +91,8 @@ exports.register = async (req, res) => {
 
     const user = await User.create({ name, email, phone: phoneClean, passwordHash, otpCode: otp, otpExpiry });
 
-    await sendOtpEmail(email, otp, name);
-
-    res.status(201).json({ message: 'Registered! OTP sent to your email.', userId: user._id, phone: phoneClean });
+    await sendOtp(phoneClean, email, otp, name);
+    res.status(201).json({ message: 'Registered! OTP sent to your phone and email.', userId: user._id, phone: phoneClean });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -104,8 +138,8 @@ exports.resendOtp = async (req, res) => {
     user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    await sendOtpEmail(user.email, otp, user.name);
-    res.json({ message: 'OTP resent to your email.' });
+    await sendOtp(user.phone, user.email, otp, user.name);
+    res.json({ message: 'OTP resent to your phone and email.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -125,8 +159,8 @@ exports.resendOtpByEmail = async (req, res) => {
     user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    await sendOtpEmail(user.email, otp, user.name);
-    res.json({ message: 'OTP sent to your email.' });
+    await sendOtp(user.phone, user.email, otp, user.name);
+    res.json({ message: 'OTP sent to your phone and email.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

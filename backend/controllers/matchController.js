@@ -1,7 +1,7 @@
 const axios = require('axios');
 const User = require('../models/User');
 const { Match } = require('../models/index');
-const { sendMatchRequestEmail, sendMatchAcceptedEmail } = require('../utils/emailNotifications');
+const { sendMatchRequestEmail, sendMatchAcceptedEmail, sendMatchRejectedEmail } = require('../utils/emailNotifications');
 
 const PYTHON_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
 
@@ -151,10 +151,13 @@ exports.respondRequest = async (req, res) => {
     match.status = action === 'accept' ? 'accepted' : 'rejected';
     await match.save();
 
-    // Send email to requester if accepted
+    // Send email to requester if accepted or rejected
     if (action === 'accept') {
       const requester = await User.findById(match.requester).select('email name');
       if (requester) sendMatchAcceptedEmail(requester.email, requester.name, req.user.name);
+    } else {
+      const requester = await User.findById(match.requester).select('email name');
+      if (requester) sendMatchRejectedEmail(requester.email, requester.name, req.user.name);
     }
 
     res.json({ match });
