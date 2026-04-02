@@ -134,7 +134,6 @@ exports.sendMessage = async (req, res) => {
 exports.getChatHistory = async (req, res) => {
   try {
     const { roomId } = req.params;
-    // Verify user is part of this room (check match)
     const match = await Match.findOne({
       chatRoomId: roomId,
       $or: [{ requester: req.user._id }, { receiver: req.user._id }],
@@ -146,7 +145,75 @@ exports.getChatHistory = async (req, res) => {
       .populate('sender', 'name profilePhoto')
       .sort({ createdAt: 1 })
       .limit(100);
+
+    // Mark all messages as read by current user
+    await ChatMessage.updateMany(
+      { roomId, sender: { $ne: req.user._id }, readBy: { $ne: req.user._id } },
+      { $addToSet: { readBy: req.user._id } }
+    );
+
     res.json({ messages });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ── SEND VOICE MESSAGE ────────────────────────────────────
+exports.sendVoiceMessage = async (req, res) => {
+  try {
+    const { roomId, voiceData, duration } = req.body;
+    if (!roomId || !voiceData) return res.status(400).json({ message: 'roomId and voiceData are required' });
+
+    const match = await Match.findOne({
+      chatRoomId: roomId,
+      $or: [{ requester: req.user._id }, { receiver: req.user._id }],
+      status: 'accepted'
+    });
+    if (!match) return res.status(403).json({ message: 'Access denied' });
+
+    const msg = await ChatMessage.create({
+      roomId, sender: req.user._id,
+      content: 'Voice message',
+      type: 'voice',
+      voiceData,
+      duration: duration || 0,
+    });
+    await msg.populate('sender', 'name profilePhoto');
+    res.status(201).json({ message: msg });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ── ADD REACTION ──────────────────────────────────────────
+exports.addReaction = async (req, res) => {
+  try {
+    const { messageId, emoji } = req.body;
+    if (!messageId || !emoji) return res.status(400).json({ message: 'messageId and emoji required' });
+
+    const msg = await ChatMessage.findById(messageId);
+    if (!msg) return res.status(404).json({ message: 'Message not found' });
+
+    // Remove existing reaction from this user then add new one
+    msg.reactions = msg.reactions.filter(r => r.userId.toString() !== req.user._id.toString());
+    msg.reactions.push({ userId: req.user._id, emoji });
+    await msg.save();
+
+    res.json({ reactions: msg.reactions });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ── MARK READ ─────────────────────────────────────────────
+exports.markRead = async (req, res) => {
+  try {
+    const { roomId } = req.body;
+    await ChatMessage.updateMany(
+      { roomId, sender: { $ne: req.user._id }, readBy: { $ne: req.user._id } },
+      { $addToSet: { readBy: req.user._id } }
+    );
+    res.json({ message: 'Marked as read' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

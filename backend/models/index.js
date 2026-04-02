@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const MatchSchema = new mongoose.Schema({
   requester: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' }, // optional
+  event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' },
   status: { type: String, enum: ['pending', 'accepted', 'rejected', 'cancelled'], default: 'pending' },
   matchScore: Number,
   interestScore: Number,
@@ -21,15 +21,10 @@ const EventSchema = new mongoose.Schema({
   creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   description: String,
-  category: String, // 'movie', 'sports', 'food', 'music', 'hangout', 'study'
+  category: String,
   date: { type: Date, required: true },
-  timeSlot: String, // 'morning', 'afternoon', 'evening'
-  location: {
-    city: String,
-    venue: String,
-    lat: Number,
-    lng: Number
-  },
+  timeSlot: String,
+  location: { city: String, venue: String, lat: Number, lng: Number },
   maxParticipants: { type: Number, default: 2 },
   participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   isOpen: { type: Boolean, default: true },
@@ -38,11 +33,17 @@ const EventSchema = new mongoose.Schema({
 
 // ─── CHAT MESSAGE ─────────────────────────────────────────
 const ChatMessageSchema = new mongoose.Schema({
-  roomId: { type: String, required: true, index: true },
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  content: { type: String, required: true },
-  type: { type: String, enum: ['text', 'system'], default: 'text' },
-  readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  roomId:    { type: String, required: true, index: true },
+  sender:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  content:   { type: String, default: '' },
+  type:      { type: String, enum: ['text', 'voice', 'system'], default: 'text' },
+  voiceData: { type: String },   // base64 audio
+  duration:  { type: Number },   // voice duration in seconds
+  readBy:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  reactions: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    emoji:  { type: String },
+  }],
 }, { timestamps: true });
 
 // ─── REPORT ───────────────────────────────────────────────
@@ -66,7 +67,7 @@ const ReviewSchema = new mongoose.Schema({
   matchId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Match', required: true },
   rating:     { type: Number, min: 1, max: 5, required: true },
   review:     { type: String, maxlength: 300 },
-  tags:       [{ type: String }], // ['punctual', 'friendly', 'fun', 'no_show', 'rude']
+  tags:       [{ type: String }],
 }, { timestamps: true });
 
 // ─── MEETUP ──────────────────────────────────────────────
