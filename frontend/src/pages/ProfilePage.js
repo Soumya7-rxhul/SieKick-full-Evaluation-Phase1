@@ -109,7 +109,7 @@ export default function ProfilePage() {
     { icon: Shield,      label: 'Safety Circle',  sub: 'Manage trusted contacts', onClick: () => setModal('safety') },
     { icon: Bell,        label: 'Notifications',  sub: 'Manage alerts',           onClick: () => setModal('notifications') },
     { icon: Eye,         label: 'Privacy',        sub: 'Control your data',       onClick: () => setModal('privacy') },
-    { icon: Activity,    label: 'System Status',  sub: 'Check all services live', onClick: () => navigate('/status') },
+    ...(user?._id === '69c99ae98688969fef140aa2' ? [{ icon: Activity, label: 'System Status', sub: 'Check all services live', onClick: () => navigate('/status') }] : []),
     { icon: HelpCircle,  label: 'Help & Support', sub: 'Get assistance',          onClick: () => setModal('help') },
   ];
 
@@ -352,7 +352,9 @@ export default function ProfilePage() {
                     </div>
                   ))}
                   <div style={{ marginTop: 8, padding: 14, background: 'rgba(124,58,237,0.1)', borderRadius: 12, border: '1px solid rgba(124,58,237,0.2)', textAlign: 'center' }}>
-                    <p style={{ color: '#2DD4BF', fontSize: 13, fontWeight: 600, margin: 0 }}>soumyabisoi10@gmail.com</p>
+                    <p style={{ color: '#A8A3C7', fontSize: 13, margin: '0 0 6px' }}>Still need help? Reach us at</p>
+                    <p style={{ color: '#2DD4BF', fontSize: 13, fontWeight: 600, margin: 0 }}>support@sidekick.com</p>
+                    <p style={{ color: '#6E6893', fontSize: 11, margin: '4px 0 0' }}>We typically respond within 24 hours</p>
                   </div>
                 </div>
               )}
