@@ -5,21 +5,22 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
 def handle_sos(data: dict):
-    user_name     = data.get('userName', 'SideKick User')
-    user_phone    = data.get('userPhone', 'Unknown')
-    user_email    = data.get('userEmail', '')
-    location      = data.get('location', {})
-    contacts      = data.get('safetyContacts', [])
-    message       = data.get('message', 'I need help!')
-    city          = location.get('city', 'Unknown location')
-    lat           = location.get('lat', '')
-    lng           = location.get('lng', '')
+    user_name  = data.get('userName', 'SideKick User')
+    user_phone = data.get('userPhone', 'Unknown')
+    user_email = data.get('userEmail', '')
+    location   = data.get('location', {})
+    contacts   = data.get('safetyContacts', [])
+    message    = data.get('message', 'I need help!')
+    city       = location.get('city', 'Unknown location')
+    lat        = location.get('lat', '')
+    lng        = location.get('lng', '')
 
     if not contacts:
         return {
             "success": False,
             "message": "No safety contacts found. Please add contacts in your Safety Circle.",
-            "alertsSent": 0
+            "alertsSent": 0,
+            "failed": []
         }
 
     maps_link = f"https://maps.google.com/?q={lat},{lng}" if lat and lng else f"https://maps.google.com/?q={city}"
@@ -28,15 +29,25 @@ def handle_sos(data: dict):
     gmail_user = os.environ.get('GMAIL_USER')
     gmail_pass = os.environ.get('GMAIL_PASS')
 
+    if not gmail_user or not gmail_pass:
+        return {
+            "success": False,
+            "message": "Email service not configured. Contact admin.",
+            "alertsSent": 0,
+            "failed": []
+        }
+
     alerts_sent = 0
     failed = []
 
     for contact in contacts:
         contact_name  = contact.get('name', 'Friend')
         contact_phone = contact.get('phone', '')
-        contact_email = contact.get('email', '')
+        # Use contact's own email if provided, otherwise fall back to user's own email
+        contact_email = contact.get('email', '').strip() or user_email
 
         if not contact_email:
+            failed.append(contact_name)
             continue
 
         html = f"""
@@ -54,6 +65,7 @@ def handle_sos(data: dict):
                     <p style="margin:4px 0;color:#A8A3C7">📍 <b style="color:#F1F0F7">Location:</b> {city}</p>
                     <p style="margin:4px 0;color:#A8A3C7">🕐 <b style="color:#F1F0F7">Time:</b> {timestamp}</p>
                     <p style="margin:4px 0;color:#A8A3C7">💬 <b style="color:#F1F0F7">Message:</b> {message}</p>
+                    <p style="margin:4px 0;color:#A8A3C7">📞 <b style="color:#F1F0F7">Contact Phone:</b> {contact_phone}</p>
                 </div>
                 <a href="{maps_link}" style="display:inline-block;margin-top:8px;padding:12px 28px;background:linear-gradient(135deg,#F43F5E,#FB923C);color:white;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px">📍 View Location on Map</a>
                 <p style="color:#6E6893;font-size:12px;margin-top:20px">Please try to contact {user_name} immediately or call emergency services if needed.</p>
@@ -81,6 +93,6 @@ def handle_sos(data: dict):
         "success": alerts_sent > 0,
         "alertsSent": alerts_sent,
         "failed": failed,
-        "message": f"SOS alert sent to {alerts_sent} contact(s)." if alerts_sent > 0 else "Failed to send alerts.",
+        "message": f"SOS alert sent to {alerts_sent} contact(s)." if alerts_sent > 0 else "Failed to send alerts. Check email configuration.",
         "timestamp": timestamp
     }
