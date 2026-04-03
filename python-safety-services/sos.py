@@ -86,13 +86,13 @@ def handle_sos(data: dict):
 
             alerts_sent += 1
         except Exception as e:
-            failed.append(contact_name)
+            failed.append(f"{contact_name} ({str(e)})")
             print(f"Failed to send SOS to {contact_email}: {e}")
 
     return {
         "success": alerts_sent > 0,
         "alertsSent": alerts_sent,
         "failed": failed,
-        "message": f"SOS alert sent to {alerts_sent} contact(s)." if alerts_sent > 0 else "Failed to send alerts. Check email configuration.",
+        "message": f"SOS alert sent to {alerts_sent} contact(s)." if alerts_sent > 0 else "Failed to send alerts.",
         "timestamp": timestamp
     }
